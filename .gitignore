@@ -13,3 +13,27 @@ __pycache__/
 data/
 archives/
 logs/
+impacts.kmz
+
+# Build and packaging
+*.egg-info/
+pip-wheel-metadata/
+build/
+dist/
+
+# pytest cache
+.pytest_cache/
+
+# Test suite (non‑versionné)
+tests/
+
+# VSCode workspace
+.vscode/
+
+# Installer metadata
+__editable__.*
+*.egg
+
+# Coverage reports
+.coverage
+htmlcov/

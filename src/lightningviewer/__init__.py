@@ -31,11 +31,11 @@ def _lazy_import(mod_name: str) -> types.ModuleType:
     Import différé d’un sous-module du paquet.
 
     Exemple :
-        parse = _lazy_import(\"parser\").parse
+        parse = _lazy_import("parser").parse
     """
     if mod_name in sys.modules:
         return sys.modules[mod_name]
-    return importlib.import_module(f\"{__name__}.{mod_name}\")
+    return importlib.import_module(f"{__name__}.{mod_name}")
 
 
 # ---------------------------------------------------------------------------
@@ -49,9 +49,9 @@ from .api import (  # noqa: E402  – import tardif voulu
 )
 
 __all__ = [
-    \"download_range\",
-    \"query_impacts\",
-    \"build_kmz\",
-    \"purge_old\",
-    \"__version__\",
+    "download_range",
+    "query_impacts",
+    "build_kmz",
+    "purge_old",
+    "__version__",
 ]

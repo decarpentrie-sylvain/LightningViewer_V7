@@ -15,7 +15,7 @@ source .venv/bin/activate
 
 echo "📦 Installation des dépendances..."
 pip install --upgrade pip
-pip install python-dotenv requests tqdm
+pip install -e '.[dev]'
 
 # Crée un fichier .env de base s’il n’existe pas déjà
 if [ ! -f .env ]; then
