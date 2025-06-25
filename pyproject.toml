@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lightningviewer"
+version = "0.1.0"
+description = "CLI + API for downloading, querying and visualising Blitzortung lightning archives."
+authors = [
+  { name = "Sylvain Decarpentrie", email = "svdvet@orange.fr" }
+]
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+dependencies = [
+  "python-dotenv",
+  "requests",
+  "tqdm",
+  "pandas",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "ruff",
+]
+
+[project.scripts]
+lv = "lightningviewer.cli:main"
