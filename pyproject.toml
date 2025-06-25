@@ -10,14 +10,14 @@ where = ["src"]
 
 [project]
 name = "lightningviewer"
-version = "0.1.0"
+version = "0.7.0"
 description = "CLI + API for downloading, querying and visualising Blitzortung lightning archives."
 authors = [
   { name = "Sylvain Decarpentrie", email = "svdvet@orange.fr" }
 ]
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT" 
 
 dependencies = [
   "python-dotenv",
