@@ -24,6 +24,7 @@ dependencies = [
   "requests",
   "tqdm",
   "pandas",
+  "geopy",
 ]
 
 [project.optional-dependencies]
@@ -34,3 +35,10 @@ dev = [
 
 [project.scripts]
 lv = "lightningviewer.cli:main"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+

@@ -141,9 +141,14 @@ def purge_old(days: int = 15) -> int:
 ###############################################################################
 
 import importlib
+from types import ModuleType
 
-def _lazy_import(name: str):
-    try:
-        return importlib.import_module(f"src.{name}")
-    except ModuleNotFoundError:
-        return importlib.import_module(name)
+def _lazy_import(name: str) -> ModuleType:
+    """
+    Import a submodule of lightningviewer by name, always using the lightningviewer package prefix.
+    """
+    # Determine full module path
+    pkg = __package__  # "lightningviewer.api" -> "lightningviewer"
+    base = pkg.split(".", 1)[0]
+    module_name = name if name.startswith(f"{base}.") else f"{base}.{name}"
+    return importlib.import_module(module_name)
