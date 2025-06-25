@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Python caches and virtual environment
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+# dotenv environment files
+.env
+
+# Données et archives
+data/
+archives/
+logs/
