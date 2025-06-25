@@ -10,7 +10,7 @@ where = ["src"]
 
 [project]
 name = "lightningviewer"
-version = "0.7.0"
+version = "0.7.2"
 description = "CLI + API for downloading, querying and visualising Blitzortung lightning archives."
 authors = [
   { name = "Sylvain Decarpentrie", email = "svdvet@orange.fr" }
