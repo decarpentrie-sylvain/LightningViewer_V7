@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # === Chargement des variables d’environnement (.env) ===
 from dotenv import load_dotenv
-from ._paths import ENV_FILE
+from lightningviewer._paths import ENV_FILE
 load_dotenv(dotenv_path=str(ENV_FILE))
 BLITZ_LOGIN = os.getenv("BLITZ_LOGIN", "")
 BLITZ_PASSWORD = os.getenv("BLITZ_PASSWORD", "")
@@ -36,7 +36,7 @@ REGION = 1
 BASE_URL = "https://data.blitzortung.org/Data/Protected"
 LOCAL_TZ = ZoneInfo("Europe/Paris")
 
-from ._paths import DB_PATH
+from lightningviewer._paths import DB_PATH
 print(f"🔍 DEBUG — DB_PATH resolved to: {DB_PATH}")
 
 # Ensure the data directory for the SQLite database exists
@@ -74,6 +74,16 @@ def download_one(ts_utc, auth, retries=3):
                 r.raise_for_status()
                 data = gzip.decompress(r.content) if ext.endswith(".gz") else r.content
 
+                # Optionnel : sauvegarde locale brute
+                archive_dir = pathlib.Path("data/archives")
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                archive_file = archive_dir / f"{ts_utc:%Y%m%d_%H%M}.json"
+                try:
+                    with open(archive_file, "wb") as f:
+                        f.write(data)
+                except Exception as e:
+                    print(f"⚠️ Échec de sauvegarde locale pour {archive_file}: {e}")
+
                 if not data.strip():
                     print(f"⚠️ Fichier vide : {url}")
                     return False
@@ -101,16 +111,16 @@ def download_one(ts_utc, auth, retries=3):
                         lat = ligne.get("lat")
                         lon = ligne.get("lon")
                         if lat is not None and lon is not None:
-                            cur.execute("""
-                                INSERT OR IGNORE INTO impacts_rtree (id, min_lat, max_lat, min_lon, max_lon)
-                                VALUES (
-                                    (SELECT rowid FROM impacts WHERE timestamp = ? AND lat = ? AND lon = ?),
-                                    ?, ?, ?, ?
-                                )
-                            """, (
-                                ts_utc.isoformat(), lat, lon,  # SELECT rowid
-                                lat, lat, lon, lon             # bounds
-                            ))
+                            cur.execute("SELECT rowid FROM impacts WHERE timestamp = ? AND lat = ? AND lon = ?",
+                                        (ts_utc.isoformat(), lat, lon))
+                            row = cur.fetchone()
+                            if row:
+                                cur.execute("""
+                                    INSERT OR IGNORE INTO impacts_rtree (id, min_lat, max_lat, min_lon, max_lon)
+                                    VALUES (?, ?, ?, ?, ?)
+                                """, (
+                                    row[0], lat, lat, lon, lon
+                                ))
 
                     conn.commit()
 
@@ -200,10 +210,10 @@ def main():
     logging.info("Fin du script.")
 
 # ----------------------------------------------------------------------
-# Petit adaptateur pour la CLI `lightning_cli` -------------------------
+# Petit adaptateur pour la CLI -------------------------
 def main_cli(ns: argparse.Namespace) -> None:
     """
-    Adaptateur fin qui reçoit le Namespace construit par lightning_cli
+    Adaptateur fin qui reçoit le Namespace construit par cli.py
     et ré‑appelle le vrai parseur interne de ce script.
 
     Le principe : on reconstruit une liste d'arguments comme s’ils

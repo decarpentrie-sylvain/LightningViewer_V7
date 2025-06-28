@@ -31,6 +31,7 @@ import math
 import os
 import zipfile
 from datetime import datetime, timezone
+from tzlocal import get_localzone
 from pathlib import Path
 from typing import Iterable
 
@@ -69,14 +70,15 @@ def _style_block(style_id: str, rgb: str, scale: float = 0.8) -> str:
 
 
 def _center_style_block() -> str:
-    """Purple‑flashy push‑pin for the center marker."""
+    """Fluorescent‑pink push‑pin for the centre marker (slightly larger)."""
     return """
   <Style id="center">
     <IconStyle>
-      <scale>1.4</scale>
+      <scale>1.8</scale>
+      <color>ffff66ff</color> <!-- aabbggrr => opaque + pink -->
       <Icon>
-        <href>https://earth.google.com/images/kml-icons/pushpin/purple-pushpin.png</href>
-      </Icon>
+        <href>http://maps.google.com/mapfiles/kml/shapes/pushpin.png</href>
+      </Icon> 
     </IconStyle>
   </Style>
 """.rstrip()
@@ -101,6 +103,16 @@ def _style_for_mcg(mcg: float | None) -> str:
     return "yellow"
 
 
+def _geo_dist_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great‑circle distance in km (haversine)."""
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = phi2 - phi1
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dl / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
 # Mapping style id → RGB
 _STYLE_RGB = {
     "red": "#ff0000",
@@ -119,6 +131,7 @@ def build_kmz(
     *,
     name: str = "impacts",
     center: tuple[float, float] | None = None,
+    rayon_km: float | None = None,
 ) -> Path:
     """
     Build a KMZ file from *df* and write it to *output_path*.
@@ -135,6 +148,9 @@ def build_kmz(
     center : (lat, lon) tuple, optional
         If provided, a purple push‑pin is added and Google Earth
         is instructed to zoom at ~20 km around that point.
+    rayon_km : float, optional
+        If given along with *center*, impacts farther than this radius (in km)
+        are excluded from the KMZ.
 
     Returns
     -------
@@ -146,11 +162,35 @@ def build_kmz(
     # ------------------------------------------------------------------ #
     # Build the KML document                                              #
     # ------------------------------------------------------------------ #
+
+    # Optional geographic filter
+    if rayon_km is not None:
+        if center is None:
+            raise ValueError("rayon_km specified but center is None")
+        lat_c, lon_c = center
+        df = df[
+            df.apply(
+                lambda r: _geo_dist_km(lat_c, lon_c, float(r["lat"]), float(r["lon"])) <= rayon_km,
+                axis=1,
+            )
+        ]
+
+    # ------------------------------------------------------------------
+    # Compute global TimeSpan (min / max) to initialise Google Earth timeline
+    # ------------------------------------------------------------------
+    if not df.empty:
+        ts_series = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+        begin_iso = ts_series.min().isoformat()
+        end_iso = ts_series.max().isoformat()
+    else:
+        begin_iso = end_iso = datetime.now(timezone.utc).isoformat()
+
     kml_parts: list[str] = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<kml xmlns="http://www.opengis.net/kml/2.2">',
         f"  <Document><name>{name}</name>",
     ]
+    kml_parts.append(f"  <TimeSpan><begin>{begin_iso}</begin><end>{end_iso}</end></TimeSpan>")
 
     # Style definitions
     kml_parts.extend(
@@ -186,12 +226,13 @@ def build_kmz(
     # Iterate over impacts
     for _, row in df.iterrows():
         ts = row["timestamp"]
-        # Ensure ISO 8601 string
-        if not isinstance(ts, str):
-            if isinstance(ts, datetime):
-                ts = ts.astimezone(timezone.utc).isoformat()
-            else:
-                ts = str(ts)
+        if not isinstance(ts, datetime):
+            ts = pd.to_datetime(ts, utc=True, errors="coerce")
+        if ts is None or pd.isna(ts):
+            ts = datetime.now(timezone.utc)
+        ts_utc = ts.astimezone(timezone.utc)
+        local_tz = get_localzone()
+        ts_local = ts.astimezone(local_tz)
 
         lat = float(row["lat"])
         lon = float(row["lon"])
@@ -200,9 +241,12 @@ def build_kmz(
 
         placemark = f"""
     <Placemark>
-      <TimeStamp><when>{ts}</when></TimeStamp>
+      <TimeStamp><when>{ts_utc.isoformat()}</when></TimeStamp>
       <styleUrl>#{style_id}</styleUrl>
-      <description>mcg: {mcg if mcg is not None else 'NaN'}</description>
+      <description><![CDATA[
+        <b>Date locale :</b> {ts_local.strftime('%d/%m/%Y %H:%M:%S')}<br/>
+        <b>mcg :</b> {mcg if mcg is not None else 'NaN'}
+      ]]></description>
       <Point><coordinates>{lon},{lat},0</coordinates></Point>
     </Placemark>
 """.rstrip()
@@ -218,8 +262,9 @@ def build_kmz(
     tmp_kml = output_path.with_suffix(".kml")
     tmp_kml.write_text(kml_content, encoding="utf-8")
 
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as kmz:
-        kmz.write(tmp_kml, arcname="doc.kml")
-
-    tmp_kml.unlink(missing_ok=True)
+    try:
+        with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as kmz:
+            kmz.write(tmp_kml, arcname="doc.kml")
+    finally:
+        tmp_kml.unlink(missing_ok=True)
     return output_path

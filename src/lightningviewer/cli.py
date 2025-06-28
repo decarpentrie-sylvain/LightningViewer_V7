@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-lightning_cli.py – CLI unifiée pour LightningViewer V7
+cli.py – CLI unifiée pour LightningViewer V7
 ======================================================
 
 Utilisation rapide :
@@ -21,7 +21,7 @@ Le script est pensé pour être déclaré comme *console‑script* :
     # dans setup.cfg ou pyproject.toml
     [options.entry_points]
     console_scripts =
-        lv = lightning_cli:main
+        lv = "lightningviewer.cli:main"
 """
 from __future__ import annotations
 
@@ -145,18 +145,18 @@ def _cmd_download(args: argparse.Namespace) -> None:
         fn(args)        # type: ignore[arg-type]
 
     # ─── Purge old impacts (>15 days) after download ─────────────────────────
-    from datetime import timedelta, datetime, timezone
     from argparse import Namespace
 
-    # Calculate purge cutoff
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(days=15)
-
-    # Invoke purge command
     mod_purge = _lazy_import("purge_blitz")
     purge_fn = getattr(mod_purge, "main_cli", None)
     if purge_fn:
-        purge_fn(Namespace(days=15))
+        # Lance la purge avec un Namespace minimal (uniquement --days)
+        purge_fn(Namespace(
+            disable_events_purge=False,
+            manual_start=None,
+            manual_end=None,
+            days=15,
+        ))
 
 
 def _cmd_query(args: argparse.Namespace) -> None:

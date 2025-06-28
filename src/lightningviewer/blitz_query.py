@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 from typing import Optional, Union
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 from lightningviewer import _paths as paths
 
@@ -16,6 +16,8 @@ def requete_impacts(
 ) -> pd.DataFrame:
     """
     Récupère les impacts entre deux dates, avec filtrage optionnel par zone autour d’un point.
+
+    Les dates naïves sont désormais interprétées comme UTC.
 
     Args:
         start (datetime | str): Date/heure UTC de début
@@ -32,6 +34,17 @@ def requete_impacts(
         start = datetime.fromisoformat(start)
     if isinstance(end, str):
         end = datetime.fromisoformat(end)
+
+    # --- Force UTC for naïve datetimes and normalise all to UTC ---------
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    else:
+        start = start.astimezone(timezone.utc)
+
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    else:
+        end = end.astimezone(timezone.utc)
 
     if not DB_PATH.exists():
         raise FileNotFoundError(f"Base SQLite introuvable : {DB_PATH.resolve()}")

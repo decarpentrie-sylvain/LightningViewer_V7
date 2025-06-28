@@ -80,7 +80,9 @@ def _geocode_nominatim(
             label = item.get("display_name", query)
             results.append((lat, lon, label))
         return results
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"Erreur Nominatim pour « {query} »: {e}")
         return None
 
 
@@ -109,7 +111,8 @@ def _geocode_google(query: str) -> list[tuple[float, float, str]] | None:
             label = result.get("formatted_address", query)
             results.append((lat, lon, label))
         return results
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Erreur Google Geocoding : {e}")
         return None
 
 
@@ -121,26 +124,40 @@ Provider = Literal["nominatim", "google"]
 def geocode(query: str) -> tuple[float, float, Provider]:
     """
     Géocode *query* et renvoie (lat, lon, provider).
-
     Stratégie :
       1. Nominatim (gratuit)
       2. Google Maps (si clé dispo)
-
     Lève ValueError si aucun fournisseur ne trouve.
     """
     query = query.strip()
     if not query:
         raise ValueError("Query vide")
 
-    res = _geocode_nominatim(query)
+    nominatim_error = None
+    res = None
+
+    try:
+        res = _geocode_nominatim(query)
+    except Exception as e:
+        nominatim_error = e
+
     if res:
         lat, lon, _label = res[0]
         return (lat, lon, "nominatim")  # type: ignore[misc]
 
-    res = _geocode_google(query)
+    try:
+        res = _geocode_google(query)
+    except Exception as e:
+        if nominatim_error:
+            raise ValueError(f"Aucun résultat pour « {query} ». Nominatim: {nominatim_error}, Google: {e}")
+        raise ValueError(f"Aucun résultat pour « {query} ». Erreur Google: {e}")
+
     if res:
         lat, lon, _label = res[0]
         return (lat, lon, "google")  # type: ignore[misc]
+
+    if nominatim_error:
+        raise ValueError(f"Aucun résultat pour « {query} ». Erreur Nominatim: {nominatim_error}")
 
     raise ValueError(f"Aucun résultat pour « {query} »")
 
@@ -152,7 +169,7 @@ class Address(NamedTuple):
 
 def geocode_multi(query: str, max_results: int = 5) -> List[Address]:
     """
-    Géocode *query* et renvoie une liste d'Address (lat, lon, label, provider).
+    Géocode *query* et renvoie une liste d de 5 adresses. Address (lat, lon, label, provider).
 
     Stratégie :
       1. Nominatim (gratuit) avec jusqu'à max_results résultats
@@ -163,8 +180,6 @@ def geocode_multi(query: str, max_results: int = 5) -> List[Address]:
     query = query.strip()
     if not query:
         return []
-
-    from .geocode import _geocode_nominatim, _geocode_google, Address
 
     # Tente Nominatim
     results = _geocode_nominatim(query, limit=max_results)

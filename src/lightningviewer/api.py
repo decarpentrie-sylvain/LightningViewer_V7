@@ -112,13 +112,19 @@ def build_kmz(
     open_after: bool = False,
 ) -> Path:
     """Construit un KMZ à partir d’un *DataFrame* (ou équivalent).
-    - *output_path* : chemin cible (créé/écrasé).
-    - *open_after*  : si True, ouvre dans l’app par défaut (macOS : « open »).
+    - *output_path*          : chemin cible (créé/écrasé).
+    - *center_lat/center_lon* : latitude/longitude du centre pour ajouter le repère violet et ajuster le zoom.
+    - *rayon_km*              : filtre optionnel par rayon (km) autour de ce centre.
+    - *open_after*            : si True, ouvre dans l’app par défaut (macOS : « open »).
     Retourne le `Path` du fichier créé.
     """
     kmz_mod = _lazy_import("build_kmz")
     path = Path(output_path)
-    kmz_mod.build_kmz(df, path)
+    kmz_mod.build_kmz(
+        df, path,
+        center=(center_lat, center_lon) if center_lat is not None and center_lon is not None else None,
+        rayon_km=rayon_km
+    )
 
     if open_after:
         import subprocess, sys

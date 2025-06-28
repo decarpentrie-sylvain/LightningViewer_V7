@@ -11,8 +11,10 @@ or, thanks to the CLI wrapper:
 
     lv gui
 """
-
 from __future__ import annotations
+
+import logging
+logging.basicConfig(level=logging.INFO)
 
 import math
 import json
@@ -24,17 +26,13 @@ from dotenv import load_dotenv
 # Load project .env explicitly
 load_dotenv(dotenv_path=ENV_FILE)
 
-# Ensure the SQLite database exists and is indexed
-from lightningviewer.init_db_blitz import main_cli as _init_db
-if not DB_PATH.exists():
-    _init_db()
-
 import os
 import pathlib
 import shutil
 import datetime as dt
 import inspect
 import argparse
+from lightningviewer.blitz_range_download_V7 import main_cli as _full_dl
 from typing import Optional
 
 # simple in-memory cache for geocoding results
@@ -53,6 +51,7 @@ def _reset_address():
 
 def _on_select():
     """Store the selected geocoded address in session state."""
+    global geo_candidates
     idx = st.session_state.sel_addr
     g = geo_candidates[idx]
     st.session_state["lat_c"] = g.lat
@@ -76,45 +75,6 @@ def _format_distance(d_km: float) -> str:
     return f"{d_km:.0f} km"
 
 # --- simple in‑memory cache to spare geocoder calls (session‑wide) ----------
-
-
-def _geocode(address: str) -> Optional[tuple[float, float, str]]:
-    """
-    Return (lat, lon, label) or None.
-    First try Nominatim; if it fails and GOOGLE_API_KEY is defined,
-    fallback to Google Geocoding API.
-    """
-    # in‑memory cache – avoids hitting the API repeatedly in one session
-    if address in _GEO_CACHE:
-        return _GEO_CACHE[address]
-
-    geolocator = Nominatim(user_agent="LightningViewerGUI", timeout=5)
-    try:
-        loc = geolocator.geocode(address)
-        if loc:
-            _GEO_CACHE[address] = (loc.latitude, loc.longitude, loc.address)
-            return loc.latitude, loc.longitude, loc.address
-    except Exception:
-        pass  # silently fallback
-
-    if GOOGLE_KEY:
-        import requests
-
-        url = (
-            "https://maps.googleapis.com/maps/api/geocode/json"
-            f"?key={GOOGLE_KEY}&address={address}"
-        )
-        try:
-            data = requests.get(url, timeout=8).json()
-            if data["status"] == "OK":
-                res = data["results"][0]
-                lat = res["geometry"]["location"]["lat"]
-                lon = res["geometry"]["location"]["lng"]
-                _GEO_CACHE[address] = (lat, lon, res["formatted_address"])
-                return lat, lon, res["formatted_address"]
-        except Exception:
-            pass
-    return None
 
 
 def _cleanup_previous() -> None:
@@ -254,14 +214,21 @@ if not DB_PATH.exists():
     else:
         init_fn(argparse.Namespace())
 
-# Download (if not already) the needed 10‑min files
-with st.spinner("Téléchargement vérification / mise à jour…"):
+# Download (full-range) the exact interval specified
+with st.spinner("Téléchargement de la plage sélectionnée…"):
     try:
-        print("DEBUG: About to call download_range")
-        download_range(start_iso_utc, end_iso_utc)
-        print("DEBUG: download_range completed without exception")
+        print("DEBUG: About to call full-range download")
+        ns_dl = argparse.Namespace(
+            start=start_iso_utc,
+            end=end_iso_utc,
+            threads=8,
+            login=os.getenv("BLITZ_LOGIN"),
+            password=os.getenv("BLITZ_PASSWORD"),
+        )
+        _full_dl(ns_dl)
+        print("DEBUG: full-range download completed without exception")
     except Exception as exc:
-        print("DEBUG: download_range raised exception", exc)
+        print("DEBUG: _full_dl raised exception", exc)
         st.error(f"Erreur durant le téléchargement : {exc}")
         st.stop()
 

@@ -9,7 +9,7 @@ On ré-exporte ici les fonctions publiques pour permettre :
 
 from __future__ import annotations
 
-__version__ = "0.7.2"
+__version__ = "0.7.3"
 
 import importlib
 import pathlib
